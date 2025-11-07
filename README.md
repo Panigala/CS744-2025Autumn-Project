@@ -1,4 +1,4 @@
-# Multi-Tier KV HTTP System (C++)
+# Multi-Tier Key-Value HTTP System (C++)
 
 ## Overview
 This project implements a **multi-tier HTTP key-value store** using:
@@ -11,12 +11,13 @@ This project implements a **multi-tier HTTP key-value store** using:
 - `server.cpp`: HTTP server with REST (PUT, GET, DELETE) endpoints that can handle multiple clients concurrently
 - `client.cpp`: Load generator to simulate concurrent clients
 - `mysql_setup.sql`: MySQL setup script
-- `experiment.sh`: Automated load testing + CPU/disk utilization collection
+- `client_test_server.cpp`: for testing all server request responses
 
 ## Setup Instructions
 1. **Install dependencies**
    ```bash
    sudo apt update
+   sudo apt install wget curl
    sudo apt install g++ make libmysqlclient-dev mysql-server mpstat sysstat iostat
    
    sudo apt install -y mysql-server mysql-client
@@ -28,7 +29,7 @@ This project implements a **multi-tier HTTP key-value store** using:
 
 2. **Download httplib header**
    ```bash
-   #if not already downloaded
+   #if not already then only  downloaded
    wget https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h
    ```
    Place it in the same directory as `server.cpp` and `client.cpp`.
@@ -37,20 +38,34 @@ This project implements a **multi-tier HTTP key-value store** using:
    ```bash
    sudo mysql -u root -p < mysql_setup.sql
    ```
-
 4. **Compile**
    ```bash
+   #compile server and the actual multithreaded-client(load generator)
    g++ -std=c++17 server.cpp -lmysqlclient -lpthread -o server
    g++ -std=c++17 client.cpp -lpthread -o client
-   chmod +x experiment.sh
    ```
 
-5. **Run**
+5. **Testing**
    ```bash
-   # put desired cpu core where this need to be run
-   taskset -c 6,7 ./server &
+   #just to test server response for request etc...
+   g++ -std=c++17 client_test_server.cpp -o test_server -lpthread
+   taskset -c 0,1 ./server &
+   taskset -c 2-7 ./test_server
+   ```
+
+
+6. **Run**
+   ```bash
+   #--------Requests supported but server--------------
+   # GET , PUT/POST , DELETE , popular , stats , health
    
-   # put desired cpu core where this need to be run
+   # put desired cpu core where this need to be run then the arguments are
+   # number of threads, time to run, GET%, POST%, DELETE%, popular%    where all % should add to 100
+   # eg : taskset -c 0-7 ./client 6000 10 0 10 90 0
    taskset -c 0-5 ./client 
    ```
+
+
+
+
 

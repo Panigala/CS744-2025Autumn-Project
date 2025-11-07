@@ -25,19 +25,19 @@ MYSQL* connect_db() {
 
     /* Try connecting to the MySQL server using provided credentials:
     - Host: 127.0.0.1  (local machine)
-    - User: kvuser
-    - Password: kvpass
-    - Database: kvdb
+    - User: user_744
+    - Password: key_744
+    - Database: key_value_DB_744
     - Port: 0 (default MySQL port 3306 will be used)
     - Socket and client flags set to nullptr and 0 */
-    if (!mysql_real_connect(conn, "127.0.0.1", "kvuser", "kvpass", "kvdb", 0, nullptr, 0)) {
+    if (!mysql_real_connect(conn, "127.0.0.1", "user_744", "key_744", "key_value_DB_744", 0, nullptr, 0)) {
         cerr << "MySQL connection failed: " << mysql_error(conn) << endl; // If connection fails, print an error message from MySQL.
         mysql_close(conn);// Close and free the connection handle to avoid leaks.
         return nullptr; // Return nullptr to indicate failure to caller.
     }
 
     // Create the key-value table if it doesn’t already exist. with - `k`: VARCHAR(255) used as the key (PRIMARY KEY ensures uniqueness) 
-    mysql_query(conn, "CREATE TABLE IF NOT EXISTS kv (k VARCHAR(255) PRIMARY KEY, v TEXT)");
+    mysql_query(conn, "CREATE TABLE IF NOT EXISTS key_value_table (k VARCHAR(255) PRIMARY KEY, v TEXT)");
     return conn;// Return the valid connection object to the caller, This will be used throughout the program to perform SQL operations.
 }
 
@@ -208,7 +208,7 @@ int main() {
         // writing to DB getting mutex for it
         lock_guard<mutex> lock(db_mutex); 
         // Construct an SQL query that inserts or replaces the key-value pair.
-        string q = "REPLACE INTO kv (k,v) VALUES('" + escape_sql(key) + "','" + escape_sql(val) + "')";
+        string q = "REPLACE INTO key_value_table (k,v) VALUES('" + escape_sql(key) + "','" + escape_sql(val) + "')";
         mysql_query(conn, q.c_str()); // Execute the SQL query on the connected MySQL server.
     
         //after writing to DB update cache ie, write through
@@ -218,16 +218,16 @@ int main() {
     };
 
     // The PUT endpoint calls handle_put_post() for any path matching /kv/<key>. used to insert or update a key-value pair.
-    server.Put(R"(/kv/(.+))", handle_put_post);
+    server.Put(R"(/table_key_value/(.+))", handle_put_post);
     // POST behaves identically to PUT here (both perform write-through updates). Some clients may prefer POST for semantic reasons (e.g., creating new data).
-    server.Post(R"(/kv/(.+))", handle_put_post);
+    server.Post(R"(/table_key_value/(.+))", handle_put_post);
 
 
 
 
    // ---------- GET endpoint handles HTTP GET requests for key lookups----------
    // it first checks the cache; if not found, it queries the MySQL database and updates the cache before returning the result.
-   server.Get(R"(/kv/(.+))", [&](const httplib::Request &request, httplib::Response &response) {
+   server.Get(R"(/table_key_value/(.+))", [&](const httplib::Request &request, httplib::Response &response) {
     string key = request.matches[1], val; // extract the key , val from url request
     
     if (cache.get(key, val)) { //check cache first
@@ -236,7 +236,7 @@ int main() {
 
         //cache miss so then aquire DB mutex
         lock_guard<mutex> lock(db_mutex);
-        string q = "SELECT v FROM kv WHERE k='" + escape_sql(key) + "' LIMIT 1"; //sql query prepare
+        string q = "SELECT v FROM key_value_table WHERE k='" + escape_sql(key) + "' LIMIT 1"; //sql query prepare
         mysql_query(conn, q.c_str()); //execute sql query
         MYSQL_RES *r = mysql_store_result(conn); // Retrieve the query result from MySQL.
         
@@ -260,13 +260,13 @@ int main() {
 
 
    //------------DELETE endpoint handles HTTP DELETE requests----------
-   server.Delete(R"(/kv/(.+))", [&](const httplib::Request &request, httplib::Response &response) {
+   server.Delete(R"(/table_key_value/(.+))", [&](const httplib::Request &request, httplib::Response &response) {
         string key = request.matches[1];
         bool found = false;
 
         // first trying to delete from DB
         {   lock_guard<mutex> lock(db_mutex);
-            string q = "DELETE FROM kv WHERE k='" + escape_sql(key) + "'";
+            string q = "DELETE FROM key_value_table WHERE k='" + escape_sql(key) + "'";
             if (mysql_query(conn, q.c_str())) {
                 response.status = 500;
                 response.set_content(string("DB error: ") + mysql_error(conn), "text/plain");
